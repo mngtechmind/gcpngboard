@@ -29,24 +29,14 @@
             -webkit-text-size-adjust: 100%;
             -ms-text-size-adjust: 100%;
             touch-action: manipulation;
-            /* Fix iOS viewport bounce */
-            position: fixed;
-            height: 100%;
-            overflow: hidden;
         }
 
         body {
             /* iOS Safari fixes */
             -webkit-overflow-scrolling: touch;
-            -webkit-user-select: none;
-            user-select: none;
-            -webkit-touch-callout: none;
             -webkit-tap-highlight-color: transparent;
-            /* Allow scrolling on body */
-            position: relative;
-            height: 100vh;
-            overflow-y: auto;
-            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
         }
 
         /* Prevent zoom on input focus in iOS */

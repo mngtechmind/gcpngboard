@@ -33,7 +33,7 @@
             "value": "nosniff"
           },
           {
-            "key": "Referrer-Policy", 
+            "key": "Referrer-Policy",
             "value": "no-referrer-when-downgrade"
           }
         ]
