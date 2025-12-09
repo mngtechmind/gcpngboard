@@ -2612,6 +2612,26 @@
             }
         }
 
+        // Security utility: Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Security utility: Generate cryptographically secure random password
+        function generateSecurePassword(length = 8) {
+            const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            const array = new Uint32Array(length);
+            window.crypto.getRandomValues(array);
+            let password = 'Temp';
+            for (let i = 0; i < length; i++) {
+                password += charset[array[i] % charset.length];
+            }
+            return password;
+        }
+
         // Universal data operations (Firebase with localStorage fallback)
         function saveUserData(userKey, userData) {
 
@@ -2809,7 +2829,7 @@
                     loginTime: new Date().toISOString()
                 };
 
-                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
                 showLoginSuccess(`Welcome ${MASTER_LOGIN.name}!`);
 
                 setTimeout(() => {
@@ -2853,7 +2873,7 @@
                             loginTime: new Date().toISOString()
                         };
 
-                        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                        sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
                         showLoginSuccess(`Welcome ${user.fullName}!`);
 
                         setTimeout(() => {
@@ -2907,7 +2927,7 @@
         // Show dashboard with access control
         function showDashboard() {
             // Validate user session before showing dashboard
-            if (!currentUser || !localStorage.getItem('currentUser')) {
+            if (!currentUser || !sessionStorage.getItem('currentUser')) {
                 showLogin();
                 return;
             }
@@ -2966,14 +2986,14 @@
         // Apply section permissions based on user role or accessFields
         function applySectionPermissions() {
             // Validate current user session
-            if (!currentUser || !localStorage.getItem('currentUser')) {
+            if (!currentUser || !sessionStorage.getItem('currentUser')) {
                 showLogin();
                 return;
             }
 
             // Double check user session validity
             try {
-                const storedUser = localStorage.getItem('currentUser');
+                const storedUser = sessionStorage.getItem('currentUser');
                 if (!storedUser) {
                     currentUser = null;
                     showLogin();
@@ -2987,7 +3007,7 @@
                 }
             } catch (e) {
                 currentUser = null;
-                localStorage.removeItem('currentUser');
+                sessionStorage.removeItem('currentUser');
                 showLogin();
                 return;
             }
@@ -3073,7 +3093,7 @@
 
             // Clear session completely
             currentUser = null;
-            localStorage.removeItem('currentUser');
+            sessionStorage.removeItem('currentUser');
 
             // Reset sidebar to default state
             document.querySelectorAll('.sidebar .nav-link').forEach(link => {
@@ -3100,7 +3120,7 @@
             if (confirm('Are you sure you want to logout?')) {
                 // Clear all session data
                 currentUser = null;
-                localStorage.removeItem('currentUser');
+                sessionStorage.removeItem('currentUser');
 
                 // Clear any cached data
                 if (typeof CacheManager !== 'undefined' && CacheManager.clear) {
@@ -3129,14 +3149,14 @@
 
         // Check for existing session on page load
         function checkExistingSession() {
-            const storedUser = localStorage.getItem('currentUser');
+            const storedUser = sessionStorage.getItem('currentUser');
             if (storedUser) {
                 try {
                     const parsedUser = JSON.parse(storedUser);
 
                     // Validate user data structure
                     if (!parsedUser || !parsedUser.username || !parsedUser.name) {
-                        localStorage.removeItem('currentUser');
+                        sessionStorage.removeItem('currentUser');
                         showLogin();
                         return false;
                     }
@@ -3173,7 +3193,7 @@
 
                             if (sessionAge > maxSessionAge) {
                                 // Session expired
-                                localStorage.removeItem('currentUser');
+                                sessionStorage.removeItem('currentUser');
                                 currentUser = null;
                                 showLogin();
                                 return false;
@@ -3183,7 +3203,7 @@
                     return true;
                 } catch (e) {
                     console.log('Session validation error:', e);
-                    localStorage.removeItem('currentUser');
+                    sessionStorage.removeItem('currentUser');
                     currentUser = null;
                 }
             }
@@ -3219,7 +3239,7 @@
         // Validate current session integrity
         function validateCurrentSession() {
             if (currentUser) {
-                const storedUser = localStorage.getItem('currentUser');
+                const storedUser = sessionStorage.getItem('currentUser');
                 if (!storedUser) {
                     // Session was cleared externally
                     currentUser = null;
@@ -3232,7 +3252,7 @@
                     if (!parsedUser || parsedUser.username !== currentUser.username) {
                         // Session mismatch
                         currentUser = null;
-                        localStorage.removeItem('currentUser');
+                        sessionStorage.removeItem('currentUser');
                         showLogin();
                         return;
                     }
@@ -3246,14 +3266,14 @@
                         if (sessionAge > maxSessionAge) {
                             // Session expired
                             currentUser = null;
-                            localStorage.removeItem('currentUser');
+                            sessionStorage.removeItem('currentUser');
                             showLogin();
                             return;
                         }
                     }
                 } catch (e) {
                     currentUser = null;
-                    localStorage.removeItem('currentUser');
+                    sessionStorage.removeItem('currentUser');
                     showLogin();
                 }
             }
@@ -3558,6 +3578,13 @@
 
         // Show edit user modal
         function showEditUserModal(userId, user) {
+            // Escape user data to prevent XSS
+            const safeUserId = escapeHtml(userId);
+            const safeFullName = escapeHtml(user.fullName || '');
+            const safePhoneNumber = escapeHtml(user.phoneNumber || '');
+            const safeEmail = escapeHtml(user.email || '');
+            const safeDescription = escapeHtml(user.description || '');
+            
             // Create modal HTML
             const modalHTML = `
                 <div class="modal fade" id="editUserModal" tabindex="-1" data-bs-backdrop="static">
@@ -3569,21 +3596,21 @@
                             </div>
                             <div class="modal-body">
                                 <form id="editUserForm" novalidate>
-                                    <input type="hidden" id="editUserId" value="${userId}">
+                                    <input type="hidden" id="editUserId" value="${safeUserId}">
                                     <div class="row g-3">
                                         <div class="col-md-6">
                                             <label class="form-label">Full Name *</label>
-                                            <input type="text" class="form-control" id="editFullName" value="${user.fullName || ''}" required minlength="3">
+                                            <input type="text" class="form-control" id="editFullName" value="${safeFullName}" required minlength="3">
                                             <div class="invalid-feedback">Full name must be at least 3 characters.</div>
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label">Phone Number *</label>
-                                            <input type="tel" class="form-control" id="editPhoneNumber" value="${user.phoneNumber || ''}" required pattern="0[789][0-9]{9}" maxlength="11" title="Mobile number must start with 07, 08, or 09">
+                                            <input type="tel" class="form-control" id="editPhoneNumber" value="${safePhoneNumber}" required pattern="0[789][0-9]{9}" maxlength="11" title="Mobile number must start with 07, 08, or 09">
                                             <div class="invalid-feedback">Phone number must be 11 digits starting with 07, 08, or 09.</div>
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label">Email</label>
-                                            <input type="email" class="form-control" id="editEmail" value="${user.email || ''}">
+                                            <input type="email" class="form-control" id="editEmail" value="${safeEmail}">
                                             <div class="invalid-feedback">Please enter a valid email.</div>
                                         </div>
                                         <div class="col-md-6">
@@ -3677,7 +3704,7 @@
                                         </div>
                                         <div class="col-12">
                                             <label class="form-label">Description/Notes</label>
-                                            <textarea class="form-control" id="editDescription" rows="2">${user.description || ''}</textarea>
+                                            <textarea class="form-control" id="editDescription" rows="2">${safeDescription}</textarea>
                                         </div>
                                     </div>
                                 </form>
@@ -6842,7 +6869,7 @@
         // Show specific section
         function showSection(sectionId) {
             // Validate session before showing any section
-            if (!currentUser || !localStorage.getItem('currentUser')) {
+            if (!currentUser || !sessionStorage.getItem('currentUser')) {
                 showLogin();
                 return;
             }
@@ -7347,7 +7374,7 @@
         }
 
         function completeLogin(userData) {
-            // Store user session
+            // Store user session (using sessionStorage for security - cleared on browser close)
             currentUser = {
                 phone: userData.phoneNumber,
                 name: userData.fullName,
@@ -7356,7 +7383,7 @@
                 loginTime: new Date().toISOString()
             };
 
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
 
             // Update last login in database
             const userKey = userData.phoneNumber;
@@ -7665,8 +7692,8 @@
 
                 const [userKey, userData] = foundUser;
 
-                // Generate temporary password
-                const tempPassword = 'Temp' + Math.random().toString(36).substring(2, 8);
+                // Generate temporary password using secure random
+                const tempPassword = generateSecurePassword(8);
                 userData.password = tempPassword;
                 userData.passwordChanged = false;
                 userData.tempPasswordGenerated = new Date().toISOString();
