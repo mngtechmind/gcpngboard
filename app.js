@@ -1,4 +1,38 @@
         // iOS Safari Compatibility Fixes
+
+        // --- Encryption Utility for Secure Storage ---
+        async function encryptData(plainText, passphrase) {
+            const salt = window.crypto.getRandomValues(new Uint8Array(16));
+            const iv = window.crypto.getRandomValues(new Uint8Array(12));
+            const enc = new TextEncoder();
+            const keyMaterial = await window.crypto.subtle.importKey(
+                "raw", enc.encode(passphrase), {name: "PBKDF2"}, false, ["deriveKey"]);
+            const key = await window.crypto.subtle.deriveKey(
+                {
+                    name: "PBKDF2",
+                    salt: salt,
+                    iterations: 100000,
+                    hash: "SHA-256"
+                },
+                keyMaterial,
+                { name: "AES-GCM", length: 256 },
+                false,
+                ["encrypt"]
+            );
+            const encrypted = await window.crypto.subtle.encrypt(
+                {name: "AES-GCM", iv: iv},
+                key,
+                enc.encode(plainText)
+            );
+            // Concatenate salt + iv + encrypted, encode as base64 for storage
+            const encryptedBytes = new Uint8Array(encrypted);
+            let fullBytes = new Uint8Array(salt.length + iv.length + encryptedBytes.length);
+            fullBytes.set(salt, 0);
+            fullBytes.set(iv, salt.length);
+            fullBytes.set(encryptedBytes, salt.length + iv.length);
+            return btoa(String.fromCharCode.apply(null, fullBytes));
+        }
+
         (function () {
             // Fix iOS viewport issues
             function fixiOSViewport() {
@@ -4950,7 +4984,13 @@
                 loginTime: new Date().toISOString()
             };
 
-            sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+            // Encrypt currentUser before storing
+            encryptData(JSON.stringify(currentUser), 'user-session-secret').then(encryptedUser => {
+                sessionStorage.setItem('currentUser', encryptedUser);
+            }).catch(e => {
+                // fallback: do not store user data if encryption fails
+                console.error('Encryption failed, not storing currentUser:', e);
+            });
 
             // Update last login in database
             const userKey = userData.phoneNumber;
